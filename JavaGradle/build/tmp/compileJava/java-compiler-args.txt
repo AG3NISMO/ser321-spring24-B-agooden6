@@ -1,0 +1,17 @@
+-source
+11
+-target
+11
+-d
+C:\\Users\\algoo\\ser321examples\\Gradle\\JavaGradle\\build\\classes\\java\\main
+-h
+C:\\Users\\algoo\\ser321examples\\Gradle\\JavaGradle\\build\\generated\\sources\\headers\\java\\main
+-g
+-sourcepath
+""
+-proc:none
+-s
+C:\\Users\\algoo\\ser321examples\\Gradle\\JavaGradle\\build\\generated\\sources\\annotationProcessor\\java\\main
+-XDuseUnsharedTable=true
+C:\\Users\\algoo\\ser321examples\\Gradle\\JavaGradle\\src\\main\\java\\Fraction.java
+C:\\Users\\algoo\\ser321examples\\Gradle\\JavaGradle\\src\\main\\java\\Multiply.java
