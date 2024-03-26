@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 import java.nio.charset.Charset;
 
+
 class WebServer {
   public static void main(String args[]) {
     WebServer server = new WebServer(9000);
@@ -121,7 +122,7 @@ class WebServer {
 
       }
       System.out.println("FINISHED PARSING HEADER\n");
-
+      
       // Generate an appropriate response to the user
       if (request == null) {
         response = "<html>Illegal request: no GET</html>".getBytes();
@@ -129,6 +130,7 @@ class WebServer {
         // create output buffer
         StringBuilder builder = new StringBuilder();
         // NOTE: output from buffer is at the end
+
 
         if (request.length() == 0) {
           // shows the default directory page
@@ -193,31 +195,56 @@ class WebServer {
             builder.append("\n");
             builder.append("File not found: " + file);
           }
-        } else if (request.contains("multiply?")) {
-          // This multiplies two numbers, there is NO error handling, so when
-          // wrong data is given this just crashes
+        } 
+        else if (request.startsWith("calculateBMI?")) {
+          response = handleCalculateBMIRequest(request, builder).getBytes();
+      }
+      else if (request.contains("multiply?")) {
+        // This multiplies two numbers, there is NO error handling, so when
+        // wrong data is given this just crashes
+          try {
+            Map<String, String> query_pairs = splitQuery(request.replace("multiply?", ""));
+        
+            
+            Integer num1 = null;
+            Integer num2 = null;
+            if (query_pairs.containsKey("num1")) {
+              num1 = Integer.parseInt(query_pairs.get("num1"));
+            }
+            if (query_pairs.containsKey("num2")) {
+              num2 = Integer.parseInt(query_pairs.get("num2"));
+            }
+        
+            // Check if both numbers are present and valid
+            if (num1 == null || num2 == null) {
+              throw new IllegalArgumentException("Missing or incorrect input parameters.");
+            }
+        
+            // do math
+            Integer result = num1 * num2;
+        
+            // Generate response
+            builder.append("HTTP/1.1 200 OK\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Result is: " + result);
+          } catch (NumberFormatException e) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Error: One or both parameters are not valid integers.");
+          } catch (IllegalArgumentException e) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append(e.getMessage());
+          }
+          
 
-          Map<String, String> query_pairs = new LinkedHashMap<String, String>();
-          // extract path parameters
-          query_pairs = splitQuery(request.replace("multiply?", ""));
-
-          // extract required fields from parameters
-          Integer num1 = Integer.parseInt(query_pairs.get("num1"));
-          Integer num2 = Integer.parseInt(query_pairs.get("num2"));
-
-          // do math
-          Integer result = num1 * num2;
-
-          // Generate response
-          builder.append("HTTP/1.1 200 OK\n");
-          builder.append("Content-Type: text/html; charset=utf-8\n");
-          builder.append("\n");
-          builder.append("Result is: " + result);
-
-          // TODO: Include error handling here with a correct error code and
-          // a response that makes sense
-
-        } else if (request.contains("github?")) {
+        }
+        
+      
+        else if (request.contains("github?")) {
           // pulls the query from the request and runs it with GitHub's REST API
           // check out https://docs.github.com/rest/reference/
           //
@@ -230,7 +257,20 @@ class WebServer {
           query_pairs = splitQuery(request.replace("github?", ""));
           String json = fetchURL("https://api.github.com/" + query_pairs.get("query"));
           System.out.println(json);
-
+          StringBuilder contentBuilder = new StringBuilder("<ul>");
+          String[] repositories = json.substring(1, json.length() - 1).split("\\},\\{");
+          for (String repo : repositories) {
+            String fullName = extractJsonValue(repo, "full_name");
+            String id = extractJsonValue(repo, "id");
+            String ownerLogin = extractJsonValue(repo, "\"owner\":{\"login\"");
+            
+            contentBuilder.append("<li>")
+                          .append("Full Name: ").append(fullName)
+                          .append(", ID: ").append(id)
+                          .append(", Owner Login: ").append(ownerLogin)
+                          .append("</li>");
+        }
+        contentBuilder.append("</ul>");
           builder.append("HTTP/1.1 200 OK\n");
           builder.append("Content-Type: text/html; charset=utf-8\n");
           builder.append("\n");
@@ -257,6 +297,53 @@ class WebServer {
 
     return response;
   }
+private String handleCalculateBMIRequest(String request, StringBuilder builder) {
+    if (request.startsWith("GET /favicon.ico")) {
+        builder.append("HTTP/1.1 404 Not Found\n");
+        builder.append("Content-Type: text/html; charset=utf-8\n");
+        builder.append("\n");
+        builder.append("Favicon not found.");
+        return builder.toString();
+    }
+
+    try {
+        Map<String, String> queryPairs = splitQuery(request.replace("calculateBMI?", ""));
+        double weight = Double.parseDouble(queryPairs.get("weight"));
+        double height = Double.parseDouble(queryPairs.get("height"));
+
+        if (weight <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Weight and height must be positive numbers.");
+        }
+
+        // Calculate BMI
+        double bmi = weight / (height * height);
+
+        // Build and return the response
+        builder.setLength(0); // Clear the builder
+        builder.append("HTTP/1.1 200 OK\n");
+        builder.append("Content-Type: text/html; charset=utf-8\n");
+        builder.append("\n");
+        builder.append("The calculated BMI is: ").append(bmi);
+        return builder.toString();
+
+    } catch (NumberFormatException e) {
+        builder.setLength(0); // Clear the builder
+        builder.append("HTTP/1.1 400 Bad Request\n");
+        builder.append("Content-Type: text/html; charset=utf-8\n");
+        builder.append("\n");
+        builder.append("Error: Weight and height must be numeric values.");
+        return builder.toString();
+
+    } catch (IllegalArgumentException e) {
+        builder.setLength(0); // Clear the builder
+        builder.append("HTTP/1.1 400 Bad Request\n");
+        builder.append("Content-Type: text/html; charset=utf-8\n");
+        builder.append("\n");
+        builder.append(e.getMessage());
+        return builder.toString();
+    }
+}
+
 
   /**
    * Method to read in a query and split it up correctly
@@ -264,20 +351,22 @@ class WebServer {
    * @return Map of all parameters and their specific values
    * @throws UnsupportedEncodingException If the URLs aren't encoded with UTF-8
    */
-  public static Map<String, String> splitQuery(String query) throws UnsupportedEncodingException {
+  public static Map<String, String> splitQuery(String query) {
     Map<String, String> query_pairs = new LinkedHashMap<String, String>();
-    // "q=hello+world%2Fme&bob=5"
-    String[] pairs = query.split("&");
-    // ["q=hello+world%2Fme", "bob=5"]
-    for (String pair : pairs) {
-      int idx = pair.indexOf("=");
-      query_pairs.put(URLDecoder.decode(pair.substring(0, idx), "UTF-8"),
-          URLDecoder.decode(pair.substring(idx + 1), "UTF-8"));
+    try {
+        String[] pairs = query.split("&");
+        for (String pair : pairs) {
+            int idx = pair.indexOf("=");
+            query_pairs.put(URLDecoder.decode(pair.substring(0, idx), "UTF-8"),
+                            URLDecoder.decode(pair.substring(idx + 1), "UTF-8"));
+        }
+    } catch (UnsupportedEncodingException e) {
+        // Handle the exception
+        e.printStackTrace();
+        // You might choose to rethrow the exception as a runtime exception, or handle it differently based on your requirements
     }
-    // {{"q", "hello world/me"}, {"bob","5"}}
     return query_pairs;
-  }
-
+}
   /**
    * Builds an HTML file list from the www directory
    * @return HTML string output of file list
@@ -362,4 +451,25 @@ class WebServer {
     }
     return sb.toString();
   }
+  private String extractJsonValue(String json, String key) {
+    String result = "";
+    try {
+        key = "\"" + key + "\"";
+        int keyIndex = json.indexOf(key);
+        if (keyIndex == -1) return result; 
+        
+        int colonIndex = json.indexOf(":", keyIndex);
+        int valueStart = colonIndex + 1;
+        int valueEnd = json.indexOf(",", valueStart);
+        if (valueEnd == -1) { 
+            valueEnd = json.indexOf("}", valueStart);
+        }
+        
+        result = json.substring(valueStart, valueEnd).trim();
+        result = result.replaceAll("^\"|\"$", "");
+    } catch (Exception e) {
+        System.out.println("Error parsing JSON: " + e.getMessage());
+    }
+    return result;
+}
 }
